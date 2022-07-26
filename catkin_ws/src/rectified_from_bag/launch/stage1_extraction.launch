@@ -1,0 +1,39 @@
+<!-- xml version="1.0"? -->
+<launch>
+    <arg name="disparity_launch" />
+    <arg name="bagfiles" />
+    <arg name="parameters" />
+    <arg name="firstcall" />
+
+    <!-- Rectify images -->
+    <node pkg="image_proc" name="image_proc" type="image_proc" ns="/theia/cam0" required="true"/>
+    <node pkg="image_proc" name="image_proc" type="image_proc" ns="/theia/cam1" required="true"/>
+    <node pkg="image_proc" name="image_proc" type="image_proc" ns="/theia/cam2" required="true"/>
+    <node pkg="image_proc" name="image_proc" type="image_proc" ns="/theia/cam3" required="true"/>
+
+    <!-- Use rectified images to calculate disparity with SGBM, RAFT, or PSM -->
+    <include file="$(find disparity_camera)/launch/$(arg disparity_launch)" ns="cams01">
+        <arg name="out_topic"   value="/disparity_map_01" />
+        <arg name="left_topic"  value="/theia/cam0/image_rect_color" />
+        <arg name="right_topic" value="/theia/cam1/image_rect_color" />
+        <arg name="info_topic"  value="/theia/cam1/camera_info" />
+        <arg name="restore_ckpt"  value="/home/vineyard/catkin_ws/src/disparity_camera/models/raftstereo-middlebury.pth" />
+    </include>
+    <include file="$(find disparity_camera)/launch/$(arg disparity_launch)" ns="cams23">
+        <arg name="out_topic"   value="/disparity_map_23" />
+        <arg name="left_topic"  value="/theia/cam2/image_rect_color" />
+        <arg name="right_topic" value="/theia/cam3/image_rect_color" />
+        <arg name="info_topic"  value="/theia/cam3/camera_info" />
+        <arg name="restore_ckpt"  value="/home/vineyard/catkin_ws/src/disparity_camera/models/raftstereo-middlebury.pth" />
+    </include>
+
+    <!-- Simple helper nodes that listen to topics and save the contents -->
+    <node pkg="process_2021" name="stage1_save_rectified" type="stage1_save_rectified.py" output="screen" required="true"/>
+    <node pkg="process_2021" name="stage1_save_disparities" type="stage1_save_disparities.py" output="screen" required="true"/>
+
+    <!-- This node runs the show, reading bag files, publishing, and saving content -->
+    <node pkg="process_2021" name="stage1_extraction" type="stage1_extraction.py" args="--bagfiles $(arg bagfiles) --parameters $(arg parameters) --first-call $(arg firstcall)" output="screen" required="true">
+        <rosparam file="$(find process_2021)/params/all_params.yaml" command="load" />
+    </node>
+
+</launch>

@@ -1,9 +1,9 @@
-import argparse
 from collections import defaultdict
-import cv2
 import numpy
 from pathlib import Path
+from PIL import Image as PILImage
 from shutil import move, rmtree
+import subprocess
 import sys
 import time
 
@@ -16,8 +16,7 @@ from sensor_msgs.msg import CameraInfo, Image
 
 # Required for operation
 REQUIRED = {
-    "nodes": ["/raw_images/image_proc"],
-    # "nodes": ["/raw_images/image_proc", "/raw_images/image_view"],
+    "nodes": ["/raw_images/image_proc", "/image_saver"],
     "timeout": 10,  # seconds
 }
 
@@ -27,6 +26,9 @@ CAM_INFO = "/raw_images/camera_info"
 
 # Place for images to live temporarily (referenced in the launch file)
 TEMP_OUT = Path("/tmp/extraction/")
+
+# Default location where RAFT images are written
+DEMO_OUT = Path("/home/RAFT-Stereo/demo_output/")
 
 
 def wipe_and_mkdir(path):
@@ -44,8 +46,7 @@ def wait_for_required():
         if abs(time.time() - start_time) > REQUIRED["timeout"]:
             raise RuntimeError(
                 "We waited, but not all required nodes and topics showed up. Required nodes:\n"
-                f"{sorted(REQUIRED['nodes'])}\nFound:\n{sorted(current_nodes)}\nRequired topics:\n"
-                f"{sorted(REQUIRED['topics'])}\nFound:\n{sorted(current_topics)}\n"
+                f"{sorted(REQUIRED['nodes'])}\nFound:\n{sorted(current_nodes)}\n"
             )
         rospy.sleep(0.25)
         current_nodes = rosnode.get_node_names()
@@ -94,7 +95,13 @@ def publish_messages(publishers, messages):
 
 def downstream_images_done(sequence):
     '''Checks that output images (rectified) have been written.'''
-    if len(list(TEMP_OUT.glob("*png"))) > sequence:
+    images = list(sorted(TEMP_OUT.glob("*png")))
+    try:
+        PILImage.open(images[-1]).tobytes()
+        readable = True
+    except (OSError, SyntaxError):
+        readable = False
+    if len(images) > sequence and readable:
         return True
     else:
         return False
@@ -166,7 +173,9 @@ def main(bagfiles):
             # Make the image numbers consistent (also part of image_saver).
             # Without this the image numbers would count up across bagfiles.
             for i, impath in enumerate(sorted(TEMP_OUT.glob("*png"))):
-                move(impath, TEMP_OUT.joinpath(f'image_{i:06d}.png'))
+                imdir = TEMP_OUT.joinpath(f'image_{i:06d}')
+                imdir.mkdir()
+                move(impath, imdir.joinpath(f'image.png'))
 
             # Move the temporary holding dir to its final destination
             topic_path = bagdir.joinpath(topic.strip("/").replace("/", "_"))
@@ -176,8 +185,27 @@ def main(bagfiles):
         pairs = assert_files_good(bagdir)
 
         # Call RAFT-Stereo on files
-        import ipdb; ipdb.set_trace()
-        pass
+        for i, pair in enumerate(pairs):
+            stereodir = bagdir.joinpath(f"stereo_{i:02d}")
+            stereodir.mkdir()
+            # Run RAFT in a minimal way
+            subprocess.check_call(
+                [
+                    "python3",
+                    "demo.py",
+                    "--restore_ckpt", "models/raftstereo-middlebury.pth",
+                    "--corr_implementation", "alt",
+                    "--mixed_precision",
+                    "--save_numpy",
+                    f"-l={str(pair[0])}/*/image.png",
+                    f"-r={str(pair[1])}/*/image.png",
+                ],
+                cwd="/home/RAFT-Stereo/",
+            )
+            # Move the ouptuts out of the default location
+            for filetype in ("png", "npy"):
+                for output in sorted(DEMO_OUT.glob(f"*.{filetype}")):
+                    move(output, stereodir.joinpath(output.name))
 
 
 if __name__ == "__main__":

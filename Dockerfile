@@ -68,3 +68,5 @@ RUN cd /home/extract/catkin_ws/ && \
     echo "source /home/extract/catkin_ws/devel/setup.bash" >> ~/.bashrc
 
 RUN echo "source activate raftstereo" >> ~/.bashrc
+
+CMD roslaunch rectified_from_bag extraction.launch

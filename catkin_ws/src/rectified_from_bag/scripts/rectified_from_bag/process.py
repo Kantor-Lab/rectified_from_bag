@@ -4,19 +4,12 @@ import subprocess
 
 
 def main(bagfiles, topics):
-    print([
-        "roslaunch",
-        "process_2021",
-        "stage1_extraction.launch",
-        "bagfiles:=" + ";".join([str(bag.absolute()) for bag in bagfiles]),
-        f"topic_file:=" + ";".join(topics),
-    ])
     subprocess.check_call([
         "roslaunch",
-        "process_2021",
-        "stage1_extraction.launch",
+        "rectified_from_bag",
+        "extraction.launch",
         "bagfiles:=" + ";".join([str(bag.absolute()) for bag in bagfiles]),
-        f"topic_file:=" + ";".join(topics),
+        f"topics:=" + ";".join(topics),
     ])
 
 
@@ -38,4 +31,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    main(args.bagfiles, args.topic_file)
+    main(args.bagfiles, args.topics)

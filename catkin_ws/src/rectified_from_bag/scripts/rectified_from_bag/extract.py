@@ -23,6 +23,10 @@ REQUIRED = {
     "timeout": 10,  # seconds
 }
 
+# Reliable publish to these topics
+IMAGE_RAW = "/raw_images/image_raw"
+CAM_INFO = "/raw_images/camera_info"
+
 
 def downstream_images_done(directories, sequence):
     '''
@@ -51,9 +55,15 @@ def publish_messages(publishers, messages):
 
     for i in range(num_messages):
         print(f"{i} ", end="", flush=True)
-        for topic in CAM_TOPICS:
+        for topic in messages.keys():
+            if topic.endswith("image_raw"):
+                pub_topic = IMAGE_RAW
+            elif topic.endswith("camera_info"):
+                pub_topic = CAM_INFO
+            else:
+                raise NotImplementedError("Didn't match approved topics")
             # The [1] is to get the message, not the timestamp
-            publishers[topic].publish(messages[topic][i][1])
+            publishers[pub_topic].publish(messages[topic][i][1])
             rospy.sleep(0.1)  # TODO: Debug
         start_time = time.time()
         timeout = 4  # seconds
@@ -73,8 +83,7 @@ def wait_for_required():
     current_nodes = rosnode.get_node_names()
     current_topics = get_current_topics()
     start_time = time.time()
-    while not all([n in current_nodes for n in REQUIRED["nodes"]]) \
-          or not all([t in current_topics for t in REQUIRED["topics"]]):
+    while not all([n in current_nodes for n in REQUIRED["nodes"]]):
         if abs(time.time() - start_time) > REQUIRED["timeout"]:
             raise RuntimeError(
                 "We waited, but not all required nodes and topics showed up. Required nodes:\n"
@@ -122,8 +131,8 @@ def main(bagfiles, topics):
 
     rospy.init_node("bag_reader")
     publishers = {
-        "/raw_images/image_raw":   rospy.Publisher("/raw_images/image_raw",   Image,      queue_size=10),
-        "/raw_images/camera_info": rospy.Publisher("/raw_images/camera_info", CameraInfo, queue_size=10),
+        IMAGE_RAW: rospy.Publisher(IMAGE_RAW, Image,      queue_size=10),
+        CAM_INFO:  rospy.Publisher(CAM_INFO,  CameraInfo, queue_size=10),
     }
     wait_for_required()
 
@@ -149,7 +158,7 @@ def main(bagfiles, topics):
             messages = defaultdict(list)
             for (topic,
                  message,
-                 message_time) in rosbag.Bag(bagfile).read_messages(EXTRACT_TOPICS):
+                 message_time) in rosbag.Bag(bagfile).read_messages(extract_topics):
                 messages[topic].append((message_time, message))
 
             # Check that the messages are ordered
@@ -157,7 +166,7 @@ def main(bagfiles, topics):
                 [msg_tuple[0].to_time() for msg_tuple in messages[key]]
                 for key in extract_topics
             ])
-            assert numpy.all(numpy.abs(numpy.diff(timing, axis=1)) > 0)
+            assert numpy.all(numpy.diff(timing, axis=1) > 0)
 
             # For what we can't, run it through the publishing process
             publish_messages(publishers, messages)

@@ -1,17 +1,14 @@
 <!-- xml version="1.0"? -->
 <launch>
 
-    <arg name="bagfiles" />
-    <arg name="topics" />
-
     <!-- Rectify images -->
     <node pkg="image_proc" name="image_proc" type="image_proc" ns="/raw_images" required="true"/>
     <node pkg="image_view" name="image_saver" type="image_saver" required="true">
         <remap from="image" to="/raw_images/image_rect_color"/>
-        <param name="filename_format" value="/home/workspace/image_%04d.png" />
+        <param name="filename_format" value="/tmp/extraction/image_%06d.png" />
     </node>
 
     <!-- This node runs the show, reading bag files, publishing, and saving content -->
-    <node pkg="rectified_from_bag" name="rectified_from_bag" type="extract.py" args="--bagfiles $(arg bagfiles) --topics $(arg topics)" output="screen" required="true"/>
+    <node pkg="rectified_from_bag" name="rectified_from_bag" type="extract.py" output="screen" required="true"/>
 
 </launch>

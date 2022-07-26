@@ -1,11 +1,9 @@
 import argparse
 from collections import defaultdict
 import cv2
-from itertools import product
-import json
 import numpy
 from pathlib import Path
-from shutil import rmtree
+from shutil import move, rmtree
 import sys
 import time
 
@@ -27,21 +25,37 @@ REQUIRED = {
 IMAGE_RAW = "/raw_images/image_raw"
 CAM_INFO = "/raw_images/camera_info"
 
-
-def downstream_images_done(directories, sequence):
-    '''
-    Checks that downstream images (rectified, disparity) have been written.
-    '''
-    saved = [
-        largest_sequence(directories[DISP_01_DIR], suffix=".npy") == sequence,
-        largest_sequence(directories[RECT_CAM0_DIR], suffix=".png") == sequence,
-        largest_sequence(directories[RECT_CAM1_DIR], suffix=".png") == sequence,
-    ]
-    return all(saved)
+# Place for images to live temporarily (referenced in the launch file)
+TEMP_OUT = Path("/tmp/extraction/")
 
 
-def get_current_topics():
-    return [t[0] for t in rospy.get_published_topics()]
+def wipe_and_mkdir(path):
+    """Removes a directory (if it exists) and make it fresh"""
+    assert not path.is_file()
+    rmtree(path, ignore_errors=True)
+    path.mkdir(parents=True)
+
+
+def wait_for_required():
+    '''Helper function to wait for certain nodes and topics to show up.'''
+    current_nodes = rosnode.get_node_names()
+    start_time = time.time()
+    while not all([n in current_nodes for n in REQUIRED["nodes"]]):
+        if abs(time.time() - start_time) > REQUIRED["timeout"]:
+            raise RuntimeError(
+                "We waited, but not all required nodes and topics showed up. Required nodes:\n"
+                f"{sorted(REQUIRED['nodes'])}\nFound:\n{sorted(current_nodes)}\nRequired topics:\n"
+                f"{sorted(REQUIRED['topics'])}\nFound:\n{sorted(current_topics)}\n"
+            )
+        rospy.sleep(0.25)
+        current_nodes = rosnode.get_node_names()
+        stop_if_dead()
+
+
+def stop_if_dead():
+    '''Check whether the user has hit control-c and exit if so.'''
+    if rospy.is_shutdown():
+        sys.exit(1)
 
 
 def publish_messages(publishers, messages):
@@ -67,67 +81,35 @@ def publish_messages(publishers, messages):
             rospy.sleep(0.1)  # TODO: Debug
         start_time = time.time()
         timeout = 4  # seconds
-        # while not downstream_images_done(directories, i):
-        if abs(time.time() - start_time) < timeout:
-            # raise RuntimeError(
-            #     f"Sequence {i} was published but downstream image files"
-            #     " (rectified or disparity) never appeared."
-            # )
-            rospy.sleep(0.25)
+        while not downstream_images_done(i):
+            if time.time() - start_time > timeout:
+                raise RuntimeError(
+                    f"Sequence {i} was published but downstream image files"
+                    " (rectified) never appeared."
+                )
+            rospy.sleep(0.1)
             stop_if_dead()
     print("")
 
 
-def wait_for_required():
-    '''Helper function to wait for certain nodes and topics to show up.'''
-    current_nodes = rosnode.get_node_names()
-    current_topics = get_current_topics()
-    start_time = time.time()
-    while not all([n in current_nodes for n in REQUIRED["nodes"]]):
-        if abs(time.time() - start_time) > REQUIRED["timeout"]:
-            raise RuntimeError(
-                "We waited, but not all required nodes and topics showed up. Required nodes:\n"
-                f"{sorted(REQUIRED['nodes'])}\nFound:\n{sorted(current_nodes)}\nRequired topics:\n"
-                f"{sorted(REQUIRED['topics'])}\nFound:\n{sorted(current_topics)}\n"
-            )
-        rospy.sleep(0.25)
-        current_nodes = rosnode.get_node_names()
-        current_topics = get_current_topics()
-        stop_if_dead()
+def downstream_images_done(sequence):
+    '''Checks that output images (rectified) have been written.'''
+    if len(list(TEMP_OUT.glob("*png"))) > sequence:
+        return True
+    else:
+        return False
 
 
-def stop_if_dead():
-    '''Check whether the user has hit control-c and exit if so.'''
-    if rospy.is_shutdown():
-        sys.exit(1)
+def assert_files_good(bagdir):
+    subdirs = list(sorted(bagdir.glob("*/")))
+    pairs = [subdirs[i:i+2] for i in range(0, len(subdirs), 2)]
+    # Check that the pairs have the same number of images
+    for d1, d2 in pairs:
+        assert len(list(d1.glob("*png"))) == len(list(d2.glob("*png")))
+    return pairs
 
 
-def assert_files_good(directories):
-    for dirname, suffix in ((CAM_INFO_01_DIR, ".json"),
-                            (DISP_01_DIR,     ".npy"),
-                            (DISP_01_VIS_DIR, ".png"),
-                            (CAM_INFO_23_DIR, ".json"),
-                            (DISP_23_DIR,     ".npy"),
-                            (DISP_23_VIS_DIR, ".png"),
-                            (RECT_CAM0_DIR,   ".png"),
-                            (RECT_CAM1_DIR,   ".png"),
-                            (RECT_CAM2_DIR,   ".png"),
-                            (RECT_CAM3_DIR,   ".png")):
-        # Hardcoded number of correct files
-        files = [x for x in directories[dirname].glob(f"*{suffix}")]
-        assert len(files) == 7, f"{dirname} couldn't find 7 *{suffix} files"
-        # For now hard-code these shapes
-        if suffix in (".npy", ".png"):
-            for file in files:
-                if suffix == ".npy":
-                    assert numpy.load(file).shape == (2048, 2448), \
-                        f"{file} failed shape test"
-                else:
-                    assert cv2.imread(str(file)).shape == (2048, 2448, 3), \
-                        f"{file} failed shape test"
-
-
-def main(bagfiles, topics):
+def main(bagfiles):
 
     rospy.init_node("bag_reader")
     publishers = {
@@ -136,24 +118,26 @@ def main(bagfiles, topics):
     }
     wait_for_required()
 
-    # # Necessary settings
-    # path_prefix =    rospy.get_param("~path_prefix")
-    # stage1_dirname = rospy.get_param("~stage1_extraction_dir")
-    # run_profiling =  rospy.get_param("~stage1_run_profiling")
-
     for i, bagfile in enumerate(bagfiles):
 
+        # Make a sourceable final destination
+        bagdir = Path("/home/workspace").joinpath(bagfile.name.replace(".bag", ""))
+        wipe_and_mkdir(bagdir)
+
+        topics = [
+            topic for topic in rosbag.Bag(bagfile, "r").get_type_and_topic_info()[1].keys()
+            if topic.endswith("image_raw")
+        ]
+
         for topic in topics:
-            print(f"Processing {i+1}: {bagfile.name} / {topic}")
+            print(f"Processing {i+1}: {bagfile.name}: {topic}")
+
+            # Make a temporary repeatable output
+            wipe_and_mkdir(TEMP_OUT)
 
             # Given the image topic, add the camera_info topic. We need these
             # two to be paired
-            assert topic.split("/")[-1] == "image_raw", \
-                   "For now, the process assumes we are using image_raw topic"
-            extract_topics = [
-                topic,
-                topic.replace("image_raw", "camera_info")
-            ]
+            extract_topics = [topic,topic.replace("image_raw", "camera_info")]
 
             messages = defaultdict(list)
             for (topic,
@@ -173,29 +157,28 @@ def main(bagfiles, topics):
 
             # Give a little time for images to finish writing (cv2.imread calls
             # were failing otherwise)
-            rospy.sleep(1.0)
+            rospy.sleep(0.1)
 
-            # Check that we have everything we need
-            # assert_files_good(directories)
+            # Remove all *.ini files (part of image_saver, don't care about
+            # them)
+            for ini_file in TEMP_OUT.glob("*ini"):
+                ini_file.unlink()
+            # Make the image numbers consistent (also part of image_saver).
+            # Without this the image numbers would count up across bagfiles.
+            for i, impath in enumerate(sorted(TEMP_OUT.glob("*png"))):
+                move(impath, TEMP_OUT.joinpath(f'image_{i:06d}.png'))
+
+            # Move the temporary holding dir to its final destination
+            topic_path = bagdir.joinpath(topic.strip("/").replace("/", "_"))
+            move(TEMP_OUT, topic_path)
+
+        # Check that we have everything we need
+        pairs = assert_files_good(bagdir)
+
+        # Call RAFT-Stereo on files
+        import ipdb; ipdb.set_trace()
+        pass
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Extracts data from the vineyard bagfiles."
-    )
-    parser.add_argument(
-        "--bagfiles",
-        help="Give all bagfiles you want processed here. For example, you can"
-             " use wildcards like 'python3 process_bags.py ROW9/*bag'",
-    )
-    parser.add_argument(
-        "--topics",
-        help="CSV file containing XXXX.",
-    )
-    # Only parse known args to ignore some ROS-generated stuff
-    args, _ = parser.parse_known_args()
-    # The bags/topics have been separated by ; to go through the roslaunch file
-    main(
-        bagfiles=[Path(bag) for bag in args.bagfiles.split(";")],
-        topics=[_ for _ in args.topics.split(";")]
-    )
+    main(bagfiles=[_ for _ in Path("/home/workspace/").glob("*bag")])

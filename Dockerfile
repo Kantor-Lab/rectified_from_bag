@@ -37,17 +37,24 @@ RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.
         && \
     echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 
-# Stuff required for RAFT and PSM
-RUN apt-get install -y python3-pip
-RUN pip3 install torch==1.7.0 \
-         torchvision==0.8.1 \
-         tensorboard \
-         tqdm \
-         opt_einsum \
-         imageio \
-         py7zr
+# Get RAFT-stereo and install its pre-requisites
 RUN cd /home/ && git clone https://github.com/princeton-vl/RAFT-Stereo.git
 RUN cd /home/RAFT-Stereo/ && git checkout f1fa15abd34187d101806f65b813f4d9d6f93ab0
+RUN cd /home/RAFT-Stereo/ && ./download_models.sh
+
+# Install base utilities for Conda (used by RAFT for packaging)
+RUN apt-get update && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+# Install miniconda
+ENV CONDA_DIR /opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+     /bin/bash ~/miniconda.sh -b -p /opt/conda
+# Put conda in path so we can use conda activate
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+# Get the RAFT packages
+RUN cd /home/RAFT-Stereo/ && conda env create -f environment.yaml
 
 # Set up the stereo processing code
 RUN mkdir /home/extract/ && \
@@ -57,6 +64,7 @@ COPY . /home/extract/
 RUN cd /home/extract/catkin_ws/ && \
     rm -rf build/ devel/ && \
     source /opt/ros/noetic/setup.bash && \
-    catkin_make clean && \
-    catkin_make && \
+    catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 && \
     echo "source /home/extract/catkin_ws/devel/setup.bash" >> ~/.bashrc
+
+RUN echo "source activate raftstereo" >> ~/.bashrc

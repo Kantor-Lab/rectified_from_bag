@@ -57,9 +57,7 @@ ENV PATH=$CONDA_DIR/bin:$PATH
 RUN cd /home/RAFT-Stereo/ && conda env create -f environment.yaml
 
 # Set up the stereo processing code
-RUN mkdir /home/extract/ && \
-    cd /home/extract/ && \
-    echo 'alias extract="python3 /home/extract/catkin_ws/src/rectified_from_bag/scripts/rectified_from_bag/extract.py"' >> ~/.bash_aliases
+RUN mkdir /home/extract/
 COPY . /home/extract/
 RUN cd /home/extract/catkin_ws/ && \
     rm -rf build/ devel/ && \
@@ -67,6 +65,9 @@ RUN cd /home/extract/catkin_ws/ && \
     catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3 && \
     echo "source /home/extract/catkin_ws/devel/setup.bash" >> ~/.bashrc
 
+# Activate the conda environment (this is a huge pain)
 RUN echo "source activate raftstereo" >> ~/.bashrc
 
-CMD roslaunch rectified_from_bag extraction.launch
+# TODO: Get this working
+# CMD roslaunch rectified_from_bag extraction.launch
+RUN echo "alias process='roslaunch rectified_from_bag extraction.launch'" >> ~/.bashrc

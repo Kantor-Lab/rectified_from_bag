@@ -38,6 +38,7 @@ RUN echo "deb http://packages.ros.org/ros/ubuntu focal main" > /etc/apt/sources.
     echo "source /opt/ros/noetic/setup.bash" >> ~/.bashrc
 
 # Stuff required for RAFT and PSM
+RUN apt-get install -y python3-pip
 RUN pip3 install torch==1.7.0 \
          torchvision==0.8.1 \
          tensorboard \

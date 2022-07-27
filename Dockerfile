@@ -77,3 +77,5 @@ RUN echo "alias process='roslaunch rectified_from_bag extraction.launch'" >> ~/.
 #     pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 # Then run
 #     docker commit <container_id> franzericschneider/raft-from-bag:vX
+# In the future, I would suggest splitting different actions (like extraction / RAFT)
+# into separate components, and leave conda alone outside of docker :P

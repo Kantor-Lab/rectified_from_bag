@@ -71,3 +71,9 @@ RUN echo "source activate raftstereo" >> ~/.bashrc
 # TODO: Get this working
 # CMD roslaunch rectified_from_bag extraction.launch
 RUN echo "alias process='roslaunch rectified_from_bag extraction.launch'" >> ~/.bashrc
+
+# Ugh. This is super hacky, but I can't get this upgrade to work well with the
+# RAFT-stereo conda file. For right now, open a docker container, run this:
+#     pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+# Then run
+#     docker commit <container_id> franzericschneider/raft-from-bag:vX

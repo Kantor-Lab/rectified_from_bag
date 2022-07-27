@@ -144,13 +144,14 @@ def main(bagfiles):
 
             # Given the image topic, add the camera_info topic. We need these
             # two to be paired
-            extract_topics = [topic,topic.replace("image_raw", "camera_info")]
+            extract_topics = [topic,
+                              topic.replace("image_raw", "camera_info")]
 
             messages = defaultdict(list)
-            for (topic,
+            for (read_topic,
                  message,
                  message_time) in rosbag.Bag(bagfile).read_messages(extract_topics):
-                messages[topic].append((message_time, message))
+                messages[read_topic].append((message_time, message))
 
             # Check that the messages are ordered
             timing = numpy.array([

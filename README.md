@@ -55,3 +55,11 @@ Another annoyance is that RAFT wants to consume the images in a stacked folder s
 ```
 alias flatten='for dirr in */; do mv "$dirr"image.png "${dirr::-1}".png; rm -r "$dirr$; done'
 ```
+
+## Cleaning unwanted `npy`s
+
+If you are only interested in visualization and don't need the `npy` files which contain the depth data, you can remove all `npy` files recursively from a directory by running `recurse_rm_npy` after pasting this code (once) into the `~/.bash_aliases` file:
+
+```
+alias recurse_rm_npy='find . -type f -name "*.npy" -delete'
+```

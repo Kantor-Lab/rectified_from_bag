@@ -1,7 +1,7 @@
 # rectified_from_bag
 Take in a set of rosbags and output rectified images.
 
-##Docker pulling/starting/running##
+## Docker pulling/starting/running
 
 In order to get this docker image you can pull the image like so:
 ```
@@ -34,12 +34,12 @@ If you have the container open in one terminal, you can open a second terminal l
 sudo docker exec -it extract /bin/bash
 ```
 
-##Permissions##
+## Permissions
 
 Docker by default claims its created files as root, and I don't want to keep messing with Docker to make that not be the case. Instead, do a little post-processing. For starters, the first time you use a system you can place this function in your `~/.bash_aliases` file.
 
 ```
-function claim() {alias flatten='for dirr in */; do mv "$dirr"image.png "${dirr::-1}".png; rm -r "$dirr$; done'
+function claim() {
     sudo chmod -R 755 $1;
     sudo chown -R $USER $1;
     sudo chgrp -R $USER $1;
@@ -48,10 +48,18 @@ function claim() {alias flatten='for dirr in */; do mv "$dirr"image.png "${dirr:
 
 Then, after a `process` run, from outside the docker container you can run `claim /home/exouser/Documents/<folder-name>/`, or wherever your bag files were placed.
 
-##Flattening images##
+## Flattening images
 
 Another annoyance is that RAFT wants to consume the images in a stacked folder structure. In order to unflatten the images, if you want to, you can `cd` into a folder with images and run `flatten` after pasting this code (once) into the `~/.bash_aliases` file:
 
 ```
-alias flatten='for dirr in */; do mv "$dirr"image.png "${dirr::-1}".png; rm -r "$dirr$; done'
+alias flatten='for dirr in */; do mv "$dirr"image.png "${dirr::-1}".png; rm -r "$dirr"; done'
+```
+
+## Cleaning unwanted `npy`s
+
+If you are only interested in visualization and don't need the `npy` files which contain the depth data, you can remove all `npy` files recursively from a directory by running `recurse_rm_npy` after pasting this code (once) into the `~/.bash_aliases` file:
+
+```
+alias recurse_rm_npy='find . -type f -name "*.npy" -delete'
 ```

@@ -63,8 +63,9 @@ def main(indir, outdir, imagedir, baseline, focal, cx, cy, z_min, z_max):
         if impath is not None:
             cloud.colors = open3d.utility.Vector3dVector(imread(impath)[mask])
 
-        save_path = outdir.joinpath(disp_path.name.replace(".npy", ".pcd"))
-        open3d.io.write_point_cloud(str(save_path), cloud)
+        save_path = outdir.joinpath(disp_path.name.replace(".npy", ".ply"))
+        assert open3d.io.write_point_cloud(str(save_path), cloud), \
+            f"Failed writing cloud to {save_path}"
 
 
 def imread(path):
@@ -127,7 +128,7 @@ def parse_args():
     )
     parser.add_argument(
         "-o", "--outdir",
-        help="Path to save colorized point cloud (pcd) files in.",
+        help="Path to save colorized point cloud (ply) files in.",
         required=True,
         type=Path,
     )
@@ -155,9 +156,11 @@ def parse_args():
     assert args.min_filter >= 0, "Min filter value should be positive"
     assert args.max_filter > args.min_filter, "Max filter should be larger than min"
 
-    for directory in (args.indir, args.outdir, args.imagedir):
-        if directory is not None:
-            assert directory.is_dir(), f"{directory} is not a directory"
+    assert args.indir.is_dir(), f"{args.indir} is not a directory"
+    if not args.outdir.is_dir():
+        args.outdir.mkdir()
+    if args.imagedir is not None:
+        assert args.imagedir.is_dir(), f"{args.imagedir} is not a directory"
 
     return args
 

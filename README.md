@@ -106,7 +106,7 @@ optional arguments:
                         calibration). (default: None)
 ```
 
-### Example of using this tool on Jetstream
+#### Example of using this tool on Jetstream
 
 Note that we are in the `~/Downloads/` folder, where I saved the file.
 
@@ -129,7 +129,7 @@ image_000005.ply  image_000012.ply  image_000019.ply  image_000026.ply
 image_000006.ply  image_000013.ply  image_000020.ply  image_000027.ply
 ```
 
-### Getting the intrinsic calibration values
+#### Getting the intrinsic calibration values
 
 There are a variety of ways to do this. You could get them at calibration time, or if you know where the calibrated values are stored, or if you open up a rosbag in python and read the `camera_info` topic values. I played back a bag taken on 7/27 and got these values which should be fairly good for data collected in Iowa:
 
@@ -145,7 +145,7 @@ That means we have
 --center-y 496.39       [pixels]
 ```
 
-### Setup steps the first time you set this up
+#### Setup steps the first time you set this up
 
 The first time you download the tool, run the following setup installs. I haven't bothered to make a virtual environment for these because they are quite simple. We could make an environment, it just has to be saved and documented.
 
@@ -154,6 +154,26 @@ pip3 install opencv-python
 pip3 install open3d
 ```
 
-### How to visualize cloud files
+#### How to automate this
+
+Assuming you know your desired intrinsic calibration values (and assuming the script is in `~/Downloads/`, paste the following code into `bash_aliases` and then just run `get_depth` in future terminals.
+
+```
+function get_depth() {
+    for dirr in */
+    do
+        python ~/Downloads/disparity_to_depth.py \
+            --baseline 0.10289 \
+            --focal-length 1721.12 \
+            --center-x 707.17 \
+            --center-y 496.39 \
+            --indir "$dirr"stereo_00/ \
+            --outdir "$dirr"clouds/ \
+            --imagedir "$dirr"theia_left_image_raw/
+    done
+}
+```
+
+#### How to visualize cloud files
 
 I like using CloudCompare to visualize cloud files, which you can do on Jetstream OR on your own computer after rsync-ing files to your computer. CloudCompare can be installed once with `sudo apt-get -y install cloudcompare`. Personally I'd suggesting bringing the cloud files back to your own computer and viewing them there, CloudCompare may stress the remote desktop.

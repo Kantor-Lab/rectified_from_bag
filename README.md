@@ -63,3 +63,6 @@ If you are only interested in visualization and don't need the `npy` files which
 ```
 alias recurse_rm_npy='find . -type f -name "*.npy" -delete'
 ```
+
+## Getting depth from disparity files
+

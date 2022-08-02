@@ -8,6 +8,7 @@ disparity images.
 
 import argparse
 import cv2
+from itertools import repeat
 import numpy
 import open3d
 from pathlib import Path
@@ -15,26 +16,38 @@ from pathlib import Path
 
 def main(indir, outdir, imagedir, baseline, focal, cx, cy, z_min, z_max):
 
+    # Handle the case where no imagedir is given
+    if imagedir is None:
+        image_generator = repeat(None)
+    else:
+        image_generator = sorted(imagedir.glob("*"))
+
     rows = None
     cols = None
-
-    # TODO: Make an option not to give the image directory
-    for disp_path, impath in zip(sorted(indir.glob("*.npy")),
-                                 sorted(imagedir.glob("*"))):
+    for disp_path, impath in zip(sorted(indir.glob("*.npy")), image_generator):
 
         disparity = numpy.load(disp_path)
+
+        # HACK - By default, RAFT takes 1080 images and makes them divisible by
+        # 32, a.k.a. 1088. Undo that here. If other sized images come up in the
+        # future, deal with them.
+        if disparity.shape[0] == 1088:
+            disparity = disparity[4:-4, :]
+        else:
+            raise ValueError("Make sure disparity shape and image shape match,"
+                             " you may need to clip padded pixels off as here.")
 
         # Make matrices where the (i, j) position of a pixel is captured in
         # the row (i) and column (j) of these two matrices
         if rows is None or cols is None:
             rows = numpy.ones(disparity.shape) * \
-                   numpy.array(disparity.shape[0]).reshape((-1, 1)) - cy
+                   numpy.array(range(disparity.shape[0])).reshape((-1, 1)) - cy
             cols = numpy.ones(disparity.shape) * \
-                   numpy.array(disparity.shape[1]) - cx
+                   numpy.array(range(disparity.shape[1])) - cx
 
         # depth = focal length * baseline / disparity
-        # TODO: Is abs(right) here?
         stub = baseline / numpy.abs(disparity)
+        # z = baseline * focal_length / disparity
         z = focal * stub
         # y = baseline * (i - cy) / disparity
         # x = baseline * (j - cx) / disparity
@@ -47,17 +60,11 @@ def main(indir, outdir, imagedir, baseline, focal, cx, cy, z_min, z_max):
 
         cloud = open3d.geometry.PointCloud()
         cloud.points = open3d.utility.Vector3dVector(points)
-        # TODO: Fix the image size mismatch
         if impath is not None:
-            print(f"imread(impath).shape: {imread(impath).shape}")
-            print(f"mask.shape: {mask.shape}")
-            print(f"disparity.shape: {disparity.shape}")
-            print(f"points.shape: {points.shape}")
-            print(f"imread(impath)[mask].shape: {imread(impath)[mask].shape}")
             cloud.colors = open3d.utility.Vector3dVector(imread(impath)[mask])
 
         save_path = outdir.joinpath(disp_path.name.replace(".npy", ".pcd"))
-        cloud.write_point_cloud(str(save_path))
+        open3d.io.write_point_cloud(str(save_path), cloud)
 
 
 def imread(path):
@@ -102,8 +109,8 @@ def parse_args():
         help="Path to draw *.png files from as the matching color images. The"
              " images can be there as files, or there as files within folders"
              " (as RAFT desires) but in both cases the files/folders need to"
-             " sort in the same order as indir.",
-        required=True,
+             " sort in the same order as indir. You can leave this out and the"
+             " point cloud will just be uncolored.",
         type=Path,
     )
     parser.add_argument(
@@ -149,7 +156,8 @@ def parse_args():
     assert args.max_filter > args.min_filter, "Max filter should be larger than min"
 
     for directory in (args.indir, args.outdir, args.imagedir):
-        assert directory.is_dir(), f"{directory} is not a directory"
+        if directory is not None:
+            assert directory.is_dir(), f"{directory} is not a directory"
 
     return args
 

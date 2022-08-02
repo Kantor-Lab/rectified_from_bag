@@ -56,7 +56,7 @@ def main(indir, outdir, imagedir, baseline, focal, cx, cy, z_min, z_max):
 
         # Get the depth filtered points
         mask = numpy.logical_and(z >= z_min, z <= z_max)
-        points = numpy.vstack((z[mask], y[mask], x[mask])).T
+        points = numpy.vstack((x[mask], y[mask], z[mask])).T
 
         cloud = open3d.geometry.PointCloud()
         cloud.points = open3d.utility.Vector3dVector(points)
@@ -66,6 +66,7 @@ def main(indir, outdir, imagedir, baseline, focal, cx, cy, z_min, z_max):
         save_path = outdir.joinpath(disp_path.name.replace(".npy", ".ply"))
         assert open3d.io.write_point_cloud(str(save_path), cloud), \
             f"Failed writing cloud to {save_path}"
+        print (f"Saved {save_path}") 
 
 
 def imread(path):

@@ -156,7 +156,7 @@ pip3 install open3d
 
 #### How to automate this
 
-Assuming you know your desired intrinsic calibration values (and assuming the script is in `~/Downloads/`, paste the following code into `bash_aliases` and then just run `get_depth` in future terminals.
+Assuming you know your desired intrinsic calibration values (and assuming the script is in `~/Downloads/`), paste the following code (after modifying it with your intrinsics and script location) into `bash_aliases` and then just run `get_depth` in future terminals.
 
 ```
 function get_depth() {

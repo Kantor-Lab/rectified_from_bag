@@ -169,7 +169,10 @@ def assert_files_good(bagdir):
     pairs = [subdirs[i:i+2] for i in range(0, len(subdirs), 2)]
     # Check that the pairs have the same number of images
     for d1, d2 in pairs:
-        assert len(list(d1.glob("*png"))) == len(list(d2.glob("*png")))
+        len_d1 = len(list(d1.glob("*")))
+        len_d2 = len(list(d2.glob("*")))
+        assert len_d1 == len_d2,
+            f"{d1} and {d2} have different numbers of images ({len_d1} vs {len_d2})"
     return pairs
 
 
@@ -239,6 +242,8 @@ def main(bagfiles):
             move(TEMP_OUT, topic_path)
 
         # Check that we have everything we need
+        # TODO: Handle the case where left/right are mismatched by saving
+        # header timestamps above and matching them up.
         pairs = assert_files_good(bagdir)
 
         # Call RAFT-Stereo on files

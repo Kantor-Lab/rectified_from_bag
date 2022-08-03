@@ -111,7 +111,7 @@ optional arguments:
 Note that we are in the `~/Downloads/` folder, where I saved the file.
 
 ```
-(base) exouser@suitably-promoted-cardinal:~/Downloads$ python disparity_to_depth.py \
+(base) exouser@suitably-promoted-cardinal:~/Downloads$ python3 disparity_to_depth.py \
     --baseline 0.05978 \
     --focal-length 1721.12 \
     --center-x 707.17 \
@@ -162,7 +162,7 @@ Assuming you know your desired intrinsic calibration values (and assuming the sc
 function get_depth() {
     for dirr in */
     do
-        python ~/Downloads/disparity_to_depth.py \
+        python3 ~/Downloads/disparity_to_depth.py \
             --baseline 0.05978 \
             --focal-length 1721.12 \
             --center-x 707.17 \

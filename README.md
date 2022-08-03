@@ -112,7 +112,7 @@ Note that we are in the `~/Downloads/` folder, where I saved the file.
 
 ```
 (base) exouser@suitably-promoted-cardinal:~/Downloads$ python disparity_to_depth.py \
-    --baseline 0.10289 \
+    --baseline 0.05978 \
     --focal-length 1721.12 \
     --center-x 707.17 \
     --center-y 496.39 \
@@ -131,7 +131,7 @@ image_000006.ply  image_000013.ply  image_000020.ply  image_000027.ply
 
 #### Getting the intrinsic calibration values
 
-There are a variety of ways to do this. You could get them at calibration time, or if you know where the calibrated values are stored, or if you open up a rosbag in python and read the `camera_info` topic values. I played back a bag taken on 7/27 and got these values which should be fairly good for data collected in Iowa:
+There are a variety of ways to do this. You could get them at calibration time, or if you know where the calibrated values are stored, or if you open up a rosbag in python and read the `camera_info` topic values. I played back a bag taken on 7/27 and got these values which should be fairly good for data collected in Iowa. NOTE: The baseline is calcuted by `102.8898281094086 / 1721.122222835719`, which is the `Tx` (transform in pixels) divided by `Fx` (focal length in pixels) as per the ROS `camera_info` topic.
 
 ```
 P: [1721.122222835719, 0.0, 707.1728820800781, -102.8898281094086, 0.0, 1721.122222835719, 496.393856048584, 0.0, 0.0, 0.0, 1.0, 0.0]
@@ -140,7 +140,7 @@ P: [1721.122222835719, 0.0, 707.1728820800781, -102.8898281094086, 0.0, 1721.122
 That means we have
 ```
 --focal-length 1721.12  [pixels]
---baseline 0.10289      [meters]
+--baseline 0.05978      [meters]
 --center-x 707.17       [pixels]
 --center-y 496.39       [pixels]
 ```
@@ -163,7 +163,7 @@ function get_depth() {
     for dirr in */
     do
         python ~/Downloads/disparity_to_depth.py \
-            --baseline 0.10289 \
+            --baseline 0.05978 \
             --focal-length 1721.12 \
             --center-x 707.17 \
             --center-y 496.39 \

@@ -5,7 +5,7 @@ Take in a set of rosbags and output rectified images.
 
 In order to get this docker image you can pull the image like so:
 ```
-docker pull franzericschneider/raft-from-bag:v5
+docker pull franzericschneider/raft-from-bag:v7
 ```
 
 Then this is how you start a docker container (make sure you populate the folder name with the bagfiles):

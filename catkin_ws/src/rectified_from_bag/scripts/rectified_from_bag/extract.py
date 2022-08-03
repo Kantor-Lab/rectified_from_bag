@@ -38,6 +38,63 @@ def wipe_and_mkdir(path):
     path.mkdir(parents=True)
 
 
+def get_timing(messages):
+    return numpy.array([
+        [msg_tuple[0].to_time() for msg_tuple in messages[key]]
+        for key in messages.keys()
+    ])
+
+
+def equalize_lengths(messages):
+    """
+    Take potentially unequal message lengths and discards those that are
+    furthest away from their time-pair message.
+    """
+
+    # Get things from the dictionary in a fixed order
+    keys = []
+    key_messages = []
+    for key, values in messages.items():
+        keys.append(key)
+        key_messages.append(values)
+
+    if all([len(x) == len(key_messages[0]) for x in key_messages]):
+        return messages
+
+    # Sort the indices so we go through the shorter messages first
+    indices = list(range(len(key_messages)))
+    indices = [index for _, index in sorted(zip(key_messages, indices),
+                                            key=lambda x: len(x[0]))]
+
+    notify = "WE ARE LOSING A FEW MESSAGES DUE TO MISMATCHES IN THE BAG"
+    notify += "\nWe have the following mis-matched length topics captured"
+    notify += "".join([f"\n\t{keys[index]}: {len(key_messages[index])}"
+                       for index in indices])
+    notify += "\nThe topics with more messages will have messages dropped until"
+    notify += "\nthey match the number of the less common messages."
+    print(notify)
+
+    new_key_messages = [None] * len(key_messages)
+    for i, index in enumerate(indices):
+        if i == 0:
+            new_key_messages[index] = key_messages[index]
+            continue
+        else:
+            new_messages = []
+            # Find the match for each message in the index we want to match to
+            for base_message in key_messages[indices[0]]:
+                matching = [
+                    message for message in key_messages[index]
+                    if message[1].header.stamp == base_message[1].header.stamp
+                ]
+                assert len(matching) == 1
+                new_messages.append(matching[0])
+            new_key_messages[index] = new_messages
+
+    return {key: message
+            for key, message in zip(keys, new_key_messages)}
+
+
 def wait_for_required():
     '''Helper function to wait for certain nodes and topics to show up.'''
     current_nodes = rosnode.get_node_names()
@@ -99,7 +156,7 @@ def downstream_images_done(sequence):
     try:
         PILImage.open(images[-1]).tobytes()
         readable = True
-    except (OSError, SyntaxError):
+    except (OSError, SyntaxError, IndexError):
         readable = False
     if len(images) > sequence and readable:
         return True
@@ -152,13 +209,12 @@ def main(bagfiles):
                  message,
                  message_time) in rosbag.Bag(bagfile).read_messages(extract_topics):
                 messages[read_topic].append((message_time, message))
+            # Equalize message lengths (some bags had more image_raw than
+            # camera_info)
+            messages = equalize_lengths(messages)
 
             # Check that the messages are ordered
-            timing = numpy.array([
-                [msg_tuple[0].to_time() for msg_tuple in messages[key]]
-                for key in extract_topics
-            ])
-            assert numpy.all(numpy.diff(timing, axis=1) > 0)
+            assert numpy.all(numpy.diff(get_timing(messages), axis=1) > 0)
 
             # For what we can't, run it through the publishing process
             publish_messages(publishers, messages)

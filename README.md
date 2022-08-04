@@ -1,6 +1,9 @@
 # rectified_from_bag
 Take in a set of rosbags and output rectified images.
 
+## WARNING
+Right now we think there are corner cases where the extracted `camera_info` and `image_raw` messages can be out of sync. To robustify this script we should *always* only keep pairs where the header stamps match. Also, we do not guarantee that left/right images are paired, we should explicitly pair them up using closest timestamps. This will make the tool more robust to log errors, likely in the field and very hard to debug.
+
 ## Docker pulling/starting/running
 
 In order to get this docker image you can pull the image like so:
